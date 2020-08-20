@@ -19,7 +19,7 @@ def make_vector(v):
     vector[0] = v
     return vector
 
-train_data, test_data = separated_dataset("C:\\Users\\MONSTER\\.spyder-py3\\CNN\\data_banknote_authentication.txt", 1000)
+train_data, test_data = separated_dataset("file_path", 1000)
 
 
 def sigmoid(z, derivative = False):
