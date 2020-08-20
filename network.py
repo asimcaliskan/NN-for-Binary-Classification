@@ -1,76 +1,112 @@
 import numpy as np
-import dataset_loader
-import random
+def load_dataset(file_name):
+    dataset_file = open(file_name, "r")
+    data= []
+    for line in dataset_file:
+        data.append(([float(i) for i in line.split(",")[:-1]],int(line.split(",")[-1])))
+    dataset_file.close()
+    np.random.shuffle(data)
+    return data
 
-class Network:
-    def __init__(self, network_list):
-        """Number of Layers = Length of Network List*
-          *Network List = [x,y,z...]"""
-        self.num_layers = len(network_list)
-        self.weight = [np.random.randn(k, j) for j, k in zip(network_list[:-1],network_list[1:])]#Gaussian distribution 
-        self.bias   = [np.random.randn(i,1) for i in network_list[1:]]
-    
-    def Stochastic_Gradient_Descent(self, file_name, n_training_data, mini_batch_size, epoch_number, learning_rate):
-        (training_data, test_data) = dataset_loader.separated_dataset(file_name, n_training_data)
-        for i in range(epoch_number):
-            random.shuffle(training_data)
-            mini_batches = [training_data[i: i + mini_batch_size] for i in range(0, n_training_data, mini_batch_size)]
-            for mini_batch in mini_batches:
-                self.update_neural_network(mini_batch, learning_rate)
-            print("Epoch {}: {} ".format(i, self.evaluate(test_data)/ len(test_data)))
-            
-            
-    def backpropagation(self, x, y):
-        derivative_w = [np.zeros(w.shape) for w in self.weight]
-        derivative_b = [np.zeros(b.shape) for b in self.bias]
-        activation = x
-        activations= [x] 
-        z_values = []
-        for b, w in zip(self.bias, self.weight):
-            z = np.dot(w, activation) + b
-            z_values.append(z)
-            activation = self.sigmoid(z)
-            activations.append(activation)
-        error = self.derivative_quadratic_cost(activations[-1], y) * self.derivative_sigmoid(z_values[-1])
-        derivative_b[-1] = error
-        derivative_w[-1] = np.dot(error, activations[-2].transpose())
-        
-        for l in range(2, self.num_layers):
-            error = np.dot(self.weight[-l + 1].transpose(), error) * self.derivative_sigmoid(z_values[-l])
-            derivative_b[-l] = error
-            derivative_w[-l] = np.dot(error, activations[-l - 1].transpose())
-        return (derivative_b, derivative_w)
-    
-    def update_neural_network(self, mini_batch, learning_rate):
-        derivative_w = [np.zeros(w.shape) for w in self.weight]
-        derivative_b = [np.zeros(b.shape) for b in self.bias]
+def separated_dataset(file_name, n_train_data):
+    dataset = load_dataset(file_name)
+    train_data = [(np.reshape(x,(1,4)), make_vector(y)) for x, y in dataset[0:n_train_data]]
+    test_data  = [(np.reshape(x,(1,4)), make_vector(y)) for x, y in  dataset[n_train_data:]]
+    return (train_data, test_data)
 
-        for x, y in mini_batch:
-            delta_derivative_b, delta_derivative_w = self.backpropagation(x, y)
-            derivative_b = [db + ddb for db, ddb in zip(derivative_b, delta_derivative_b)]
-            derivative_w = [dw + ddw for dw, ddw in zip(derivative_w, delta_derivative_w)]
-        self.weight = [w - (learning_rate / len(mini_batch)) * dw for w, dw in zip(self.weight, derivative_w)]
-        self.bias   = [b - (learning_rate / len(mini_batch)) * db for b, db in zip(self.bias , derivative_b)]
+def make_vector(v):
+    vector = np.zeros((1,1))
+    vector[0] = v
+    return vector
+
+train_data, test_data = separated_dataset("C:\\Users\\MONSTER\\.spyder-py3\\CNN\\data_banknote_authentication.txt", 1000)
+
+
+def sigmoid(z, derivative = False):
+    if derivative == False:   
+        return 1.0 /(1.0 + np.exp(-z))
+    else:
+        return sigmoid(z) * (1 - sigmoid(z))
+
+def quadratic_cost(y, y_hat, derivative = False):
+    if derivative == False:
+        return (y - y_hat)**2 / 2
+    else:
+        return y_hat - y 
+
+class FC:
+    def __init__(self, in_size, out_size, activation):
+        self.in_size = in_size
+        self.out_size = out_size
+        self.activation = activation
+        self.W = np.random.randn(out_size, in_size)
         
-    def derivative_quadratic_cost(self, a, y):
-        return a - y
+    def forward(self, a_prev):
+        self.a_prev = a_prev
+        self.z = np.dot(self.W, self.a_prev)
+        self.a = self.activation(self.z)
+        return self.a
     
-    def feedforward(self, a):
-        for w, b in zip(self.weight, self.bias): 
-            a = self.sigmoid(np.dot(w, a) + b)
-        return a
+    # def backward(self, error, last_layer, learning_rate):
+    #     if last_layer:
+    #         print(self.activation(self.z, derivative=True).shape, error.shape,  self.a_prev.shape)
+    #         delta = np.dot(error, self.activation(self.z, derivative=True).transpose())
+    #         self.W = self.W - learning_rate * np.dot(delta, self.a_prev.transpose())
+    #     else:
+    #         print( error.shape, self.W.transpose().shape,  self.activation(self.z, derivative=True).shape, self.a_prev.shape)
+    #         delta = np.dot(error, np.dot(self.W.transpose(), self.activation(self.z, derivative=True)))
+    #         self.W = self.W - learning_rate * np.dot(delta, self.a_prev.transpose())
+    #     return delta
     
-    def evaluate(self, test_data):
-        test_results = [ (np.round(self.feedforward(x)), y) for (x, y) in test_data]
-        return sum(int(x == y) for (x, y) in test_results)
-    
-    def quadratic_cost(self, n, y):
-        return np.sum()/2*n
-    
-    def sigmoid(self, x):
-        return 1.0 /(1.0 + np.exp(-x))
-    
-    def derivative_sigmoid(self,x):
-        return self.sigmoid(x)*(1 - self.sigmoid(x))
-    
+
+
+
+num_epoch       = 10
+mini_batch_size = 5
+train_data_size = 1000
+test_data_size  = 300
+learning_rate   = 2
+lambd           = 1
+fc1 = FC(4, 2, sigmoid)
+fc2 = FC(2, 1, sigmoid)
+
+for epoch in range(num_epoch):
+    np.random.shuffle(train_data)
+    np.random.shuffle(test_data)
+    for data_index in range(0, train_data_size, mini_batch_size):
+        d_loss_d_a3 = 0
+        for mini_batch in range(mini_batch_size):
+            y  = train_data[data_index + mini_batch][1]
+            a1 = train_data[data_index + mini_batch][0]
+            a2 = fc1.forward(a1.transpose())
+            a3 = fc2.forward(a2)
+            d_loss_d_a3 += quadratic_cost(y, a3, derivative=True)
         
+        d_loss_d_a3 = d_loss_d_a3 / mini_batch_size
+        d_z3_d_a2   = fc2.W.transpose()
+        d_z2_d_a1   = fc1.W.transpose()
+        d_a3_d_z3   = sigmoid(fc2.z, derivative=True)
+        d_a2_d_z2   = sigmoid(fc1.z, derivative=True)
+        
+        
+        error_2 = np.multiply(d_loss_d_a3, d_a3_d_z3)#................d_loss_d_z3
+        error_1 = np.multiply(d_a2_d_z2, np.dot(d_z3_d_a2, error_2))#.d_loss_d_z2
+        
+        
+        d_z3_d_w2   = fc2.a_prev.transpose()
+        d_loss_d_w2 = np.dot(error_2, d_z3_d_w2)
+        fc2.W       = np.subtract(fc2.W, learning_rate * d_loss_d_w2)  
+        d_z2_d_w1   = fc1.a_prev.transpose()
+        d_loss_d_w1 = np.dot(error_1, d_z2_d_w1)
+        fc1.W       = np.subtract(fc1.W, learning_rate * d_loss_d_w1)     
+        
+    sigma = 0
+    for data_index in range(test_data_size):
+        y  = test_data[data_index][1]
+        a1 = test_data[data_index][0]
+        a2 = fc1.forward(a1.transpose())
+        a3 = fc2.forward(a2)
+        if np.round(a3)[0][0] == y[0][0]:
+            sigma += 1
+
+    print("Epoch = {} <-> Accuracy = {}".format(epoch, sigma / test_data_size))
